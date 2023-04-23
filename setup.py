@@ -33,78 +33,50 @@ from setuptools import setup
 from setuptools.command.install import install
 
 
-class CheckCairoXcb(install):
-    def cairo_xcb_check(self):
+def check_dependencies():
+    dependencies = {
+        'cairocffi': 'cairocffi>=1.2.0',
+        'xcffib': 'xcffib>=0.5.0',
+        'xcb-util-cursor': 'xcb-util-cursor>=0.1.3',
+        'libmpdclient': 'python-mpd2>=2.0.0',
+        'xdotool': 'xdotool>=0.0.20160718'
+    }
+    
+    missing_deps = []
+    
+    for package, requirement in dependencies.items():
         try:
-            from cairocffi import cairo
-
-            cairo.cairo_xcb_surface_create
-            return True
-        except AttributeError:
-            return False
-
-    def finalize_options(self):
-        if not self.cairo_xcb_check():
-
-            print(
-                textwrap.dedent(
-                    """
-
-            It looks like your cairocffi was not built with xcffib support.  To fix this:
-
-              - Ensure a recent xcffib is installed (pip install 'xcffib>=0.5.0')
-              - The pip cache is cleared (remove ~/.cache/pip, if it exists)
-              - Reinstall cairocffi, either:
-
-                  pip install --no-deps --ignore-installed cairocffi
-
-                or
-
-                  pip uninstall cairocffi && pip install cairocffi
-            """
-                )
-            )
-
-            sys.exit(1)
-        install.finalize_options(self)
-
-
-def get_cffi_modules():
-    cffi_modules = [
-        "libqtile/pango_ffi_build.py:pango_ffi",
-        "libqtile/backend/x11/xcursors_ffi_build.py:xcursors_ffi",
-    ]
-    try:
-        from cffi.error import PkgConfigError
-        from cffi.pkgconfig import call
-    except ImportError:
-        # technically all ffi defined above wont be built
-        print("CFFI package is missing")
-    else:
-        try:
-            call("libpulse", "--libs")
-        except PkgConfigError:
-            print("Failed to find pulseaudio headers. " "PulseVolume widget will be unavailable")
-        else:
-            cffi_modules.append("libqtile/widget/pulseaudio_ffi.py:pulseaudio_ffi")
-    try:
-        import wlroots.ffi_build
-
-        cffi_modules.append(
-            "libqtile/backend/wayland/libinput_ffi_build.py:libinput_ffi",
-        )
-    except ImportError:
+            __import__(package)
+        except ImportError:
+            missing_deps.append(requirement)
+    
+    if missing_deps:
         print(
-            "Failed to find pywlroots. "
-            "Wayland backend libinput configuration will be unavailable."
+            textwrap.dedent(f"""
+                Some required dependencies are missing. To install, run:
+                pip install {' '.join(missing_deps)}
+            """)
         )
-        pass
-    return cffi_modules
+        sys.exit(1)
+
+
+class CheckDependencies(install):
+    def run(self):
+        check_dependencies()
+        install.run(self)
 
 
 setup(
-    cmdclass={"install": CheckCairoXcb},
-    use_scm_version=True,
-    cffi_modules=get_cffi_modules(),
+    name='qtile',
+    version='0.18.0',
+    packages=['libqtile'],
     include_package_data=True,
+    cmdclass={'install': CheckDependencies},
+    install_requires=[
+        'cairocffi>=1.2.0',
+        'xcffib>=0.5.0',
+        'xcb-util-cursor>=0.1.3',
+        'python-mpd2>=2.0.0',
+        'xdotool>=0.0.20160718'
+    ],
 )
